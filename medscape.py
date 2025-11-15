@@ -55,7 +55,7 @@ class ComprehensiveMedscapeScraper:
             'User-Agent': random.choice(self.user_agents)
         })
     
-    def make_request(self, url, max_retries=3, delay=2):
+    def make_request(self, url, max_retries=5, delay=2):
         """Make request with retry logic and proper delays"""
         for attempt in range(max_retries):
             try:
@@ -855,4 +855,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
