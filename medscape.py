@@ -847,7 +847,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center; color: gray;'>
-        <p>Medscape Article Scraper - For educational purposes only</p>
+        <p>Medscape Article Scraper</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -855,3 +855,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
