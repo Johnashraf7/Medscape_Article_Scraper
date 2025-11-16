@@ -655,7 +655,6 @@ def main():
         st.markdown("### ℹ️ About")
         st.info(
             "This tool helps scrape medical articles from Medscape. "
-            "Please use responsibly and respect rate limits."
         )
     
     # Mode selection
@@ -964,7 +963,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center; color: gray;'>
-        <p>Medscape Article Scraper | Enhanced User Agent Rotation | Use Responsibly</p>
+        <p>Medscape Article Scraper </p>
         </div>
         """,
         unsafe_allow_html=True
@@ -972,3 +971,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
