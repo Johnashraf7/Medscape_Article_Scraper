@@ -1441,7 +1441,7 @@ def render_analytics_tab():
 
 def main():
     st.set_page_config(
-        page_title="Advanced Medscape Scraper Pro",
+        page_title="=Medscape Scraper",
         page_icon="🏥",
         layout="wide",
         initial_sidebar_state="expanded"
@@ -1550,3 +1550,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
