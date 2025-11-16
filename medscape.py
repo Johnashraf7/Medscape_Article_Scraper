@@ -22,16 +22,62 @@ class ComprehensiveMedscapeScraper:
     def __init__(self):
         self.session = requests.Session()
         self.user_agents = [
+            # Chrome - Windows
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36',
+            
+            # Chrome - Mac
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/120.0.0.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            
+            # Chrome - Linux
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            
+            # Firefox - Windows
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0',
+            
+            # Firefox - Mac
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0',
+            
+            # Firefox - Linux
+            'Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            
+            # Edge - Windows
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/118.0.0.0 Safari/537.36',
+            
+            # Safari - Mac
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+            
+            # Mobile - iOS
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
+            'Mozilla/5.0 (iPad; CPU OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
+            
+            # Mobile - Android
+            'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36',
+            'Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36',
+            
+            # Additional browsers
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Whale/3.23.214.10 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 OPR/106.0.0.0',
         ]
         self.setup_session()
         self.base_url = "https://emedicine.medscape.com"
         self.setup_pdf_styles()
         self.content_hash_tracker = set()
+        self.request_count = 0
+        self.user_agent_rotation_frequency = 3  # Rotate every 3 requests
     
     def setup_session(self):
         """Setup session with proper headers to avoid blocking"""
@@ -51,41 +97,78 @@ class ComprehensiveMedscapeScraper:
     
     def rotate_user_agent(self):
         """Rotate user agent to avoid detection"""
-        self.session.headers.update({
-            'User-Agent': random.choice(self.user_agents)
-        })
+        self.request_count += 1
+        
+        # Rotate user agent based on frequency
+        if self.request_count % self.user_agent_rotation_frequency == 0:
+            new_agent = random.choice(self.user_agents)
+            self.session.headers.update({
+                'User-Agent': new_agent
+            })
+            if st.session_state.get('debug_mode', False):
+                st.write(f"🔄 Rotated User Agent: {new_agent[:50]}...")
+    
+    def get_random_delay(self, base_delay=3):
+        """Get random delay with jitter"""
+        return base_delay + random.uniform(0.5, 2.0)
     
     def make_request(self, url, max_retries=10, delay=3):
         """Make request with retry logic and proper delays"""
         for attempt in range(max_retries):
             try:
                 self.rotate_user_agent()
-                time.sleep(delay + random.uniform(0.5, 2.0))
+                current_delay = self.get_random_delay(delay)
+                time.sleep(current_delay)
                 
                 response = self.session.get(url, timeout=15)
                 
                 if response.status_code == 403:
-                    st.warning(f"Got 403, retrying... (attempt {attempt + 1}/{max_retries})")
-                    time.sleep(5)
+                    st.warning(f"🔒 Got 403, retrying... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(8)  # Longer wait for 403
                     continue
                 elif response.status_code == 429:
-                    st.warning(f"Rate limited, waiting... (attempt {attempt + 1}/{max_retries})")
+                    st.warning(f"⏳ Rate limited, waiting... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(15)  # Longer wait for rate limiting
+                    continue
+                elif response.status_code == 503:
+                    st.warning(f"🔧 Service unavailable, retrying... (attempt {attempt + 1}/{max_retries})")
                     time.sleep(10)
                     continue
                 elif response.status_code != 200:
-                    st.warning(f"Got status {response.status_code}, retrying... (attempt {attempt + 1}/{max_retries})")
+                    st.warning(f"⚠️ Got status {response.status_code}, retrying... (attempt {attempt + 1}/{max_retries})")
                     continue
                 
                 response.raise_for_status()
+                
+                # Check for blocking patterns in content
+                if self.is_blocked(response.text):
+                    st.warning(f"🚫 Blocking detected, rotating... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(10)
+                    continue
+                    
                 return response
                 
+            except requests.exceptions.Timeout:
+                st.warning(f"⏰ Timeout, retrying... (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(delay * (attempt + 1))
             except requests.exceptions.RequestException as e:
-                st.warning(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
+                st.warning(f"❌ Request failed (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(delay * (attempt + 1))
         
-        st.error(f"Failed to fetch {url} after {max_retries} attempts")
+        st.error(f"💥 Failed to fetch {url} after {max_retries} attempts")
         return None
+
+    def is_blocked(self, html_content):
+        """Check if response indicates blocking"""
+        blocked_indicators = [
+            "access denied", "cloudflare", "captcha", "bot protection",
+            "security check", "distil", "incapsula", "blocked"
+        ]
+        
+        content_lower = html_content.lower()
+        return any(indicator in content_lower for indicator in blocked_indicators)
 
     def setup_pdf_styles(self):
         """Setup PDF styles"""
@@ -136,7 +219,7 @@ class ComprehensiveMedscapeScraper:
         soup = BeautifulSoup(html_content, 'html.parser')
         article_links = []
         
-        st.info("Extracting articles from categorized sections...")
+        st.info("🔍 Extracting articles from categorized sections...")
         
         # Extract from topic sections only
         topic_sections = soup.find_all('div', class_='topic-section')
@@ -165,7 +248,7 @@ class ComprehensiveMedscapeScraper:
                 seen_urls.add(article['url'])
                 unique_links.append(article)
         
-        st.success(f"Found {len(unique_links)} unique articles")
+        st.success(f"✅ Found {len(unique_links)} unique articles")
         return unique_links
 
     def get_all_article_sections(self, overview_url):
@@ -323,27 +406,27 @@ class ComprehensiveMedscapeScraper:
 
     def scrape_complete_article(self, article_url):
         """Scrape complete article content from all sections"""
-        st.info(f"Scraping complete article: {article_url}")
+        st.info(f"📖 Scraping complete article: {article_url}")
         
         try:
             sections = self.get_all_article_sections(article_url)
-            st.info(f"Found {len(sections)} sections")
+            st.info(f"📑 Found {len(sections)} sections")
             
             complete_content = {}
             successful_sections = 0
             
             for section_name, section_url in sections.items():
-                st.info(f"Scraping section: {section_name}")
+                st.info(f"🔍 Scraping section: {section_name}")
                 section_content = self.scrape_section_content(section_url, section_name)
                 
                 if section_content:
                     complete_content[section_name] = section_content
                     successful_sections += 1
-                    st.success(f"{section_name}: {len(section_content)} content blocks")
+                    st.success(f"✅ {section_name}: {len(section_content)} content blocks")
                 else:
-                    st.warning(f"{section_name}: No content extracted")
+                    st.warning(f"⚠️ {section_name}: No content extracted")
                 
-                time.sleep(1 + random.uniform(0.5, 1.5))
+                time.sleep(self.get_random_delay(1))
             
             # Get article info
             response = self.make_request(article_url)
@@ -370,7 +453,7 @@ class ComprehensiveMedscapeScraper:
             }
             
         except Exception as e:
-            st.error(f"Error scraping complete article: {e}")
+            st.error(f"💥 Error scraping complete article: {e}")
             return None
 
     def _extract_title(self, soup):
@@ -472,11 +555,11 @@ class ComprehensiveMedscapeScraper:
             
             doc.build(story)
             file_size = os.path.getsize(filepath)
-            st.success(f"PDF created: {os.path.basename(filepath)} ({file_size/1024:.1f} KB)")
+            st.success(f"📄 PDF created: {os.path.basename(filepath)} ({file_size/1024:.1f} KB)")
             return filepath
             
         except Exception as e:
-            st.error(f"PDF creation failed: {e}")
+            st.error(f"💥 PDF creation failed: {e}")
             return None
 
     def _split_paragraph(self, text, max_chars=500):
@@ -522,7 +605,7 @@ def create_combined_pdf(pdf_paths, output_filename="combined_articles.pdf"):
             # (This is a simplified approach - for better results you might want to create proper cover pages)
             merger.append(pdf_path)
         except Exception as e:
-            st.warning(f"Could not merge {os.path.basename(pdf_path)}: {e}")
+            st.warning(f"⚠️ Could not merge {os.path.basename(pdf_path)}: {e}")
     
     # Save to bytes buffer
     combined_buffer = BytesIO()
@@ -553,6 +636,27 @@ def main():
         st.session_state.select_all = False
     if 'selected_articles' not in st.session_state:
         st.session_state.selected_articles = []
+    if 'debug_mode' not in st.session_state:
+        st.session_state.debug_mode = False
+    
+    # Settings sidebar
+    with st.sidebar:
+        st.header("⚙️ Settings")
+        
+        st.session_state.debug_mode = st.checkbox("Debug Mode", value=False)
+        
+        st.markdown("---")
+        st.markdown("### 📊 Statistics")
+        if st.session_state.scraper:
+            st.write(f"Requests made: {st.session_state.scraper.request_count}")
+            st.write(f"User agents: {len(st.session_state.scraper.user_agents)}")
+        
+        st.markdown("---")
+        st.markdown("### ℹ️ About")
+        st.info(
+            "This tool helps scrape medical articles from Medscape. "
+            "Please use responsibly and respect rate limits."
+        )
     
     # Mode selection
     mode = st.radio(
@@ -569,13 +673,13 @@ def main():
             placeholder="https://emedicine.medscape.com/article/..."
         )
         
-        if st.button("Generate PDF", key="single_article"):
+        if st.button("Generate PDF", key="single_article", type="primary"):
             if article_url:
                 with st.spinner("Scraping article content..."):
                     article_data = st.session_state.scraper.scrape_complete_article(article_url)
                     
                     if article_data and article_data['sections']:
-                        st.success(f"Successfully scraped article: {article_data['title']}")
+                        st.success(f"✅ Successfully scraped article: {article_data['title']}")
                         
                         # Display article info
                         col1, col2, col3 = st.columns(3)
@@ -591,7 +695,7 @@ def main():
                             pdf_path = st.session_state.scraper.create_comprehensive_pdf(article_data)
                             
                             if pdf_path:
-                                st.success("PDF generated successfully!")
+                                st.success("✅ PDF generated successfully!")
                                 
                                 # Download button
                                 with open(pdf_path, "rb") as pdf_file:
@@ -601,12 +705,13 @@ def main():
                                     label="📥 Download PDF",
                                     data=pdf_bytes,
                                     file_name=os.path.basename(pdf_path),
-                                    mime="application/pdf"
+                                    mime="application/pdf",
+                                    type="primary"
                                 )
                     else:
-                        st.error("Failed to scrape article content. Please check the URL and try again.")
+                        st.error("❌ Failed to scrape article content. Please check the URL and try again.")
             else:
-                st.warning("Please enter an article URL.")
+                st.warning("⚠️ Please enter an article URL.")
     
     else:  # Multiple Articles mode
         st.header("Multiple Articles Mode")
@@ -626,9 +731,18 @@ def main():
                 max_value=10,
                 value=3
             )
+            
+            # Update scraper delay setting
+            st.session_state.scraper.user_agent_rotation_frequency = st.slider(
+                "User Agent Rotation Frequency:",
+                min_value=1,
+                max_value=10,
+                value=3,
+                help="Rotate user agent every N requests"
+            )
         
         with col2:
-            if st.button("Discover Articles", key="discover"):
+            if st.button("🔍 Discover Articles", key="discover", use_container_width=True):
                 if base_url:
                     with st.spinner("Discovering articles..."):
                         response = st.session_state.scraper.make_request(base_url)
@@ -638,13 +752,13 @@ def main():
                             st.session_state.select_all = False
                             st.session_state.selected_articles = []
                         else:
-                            st.error("Failed to fetch the base URL.")
+                            st.error("❌ Failed to fetch the base URL.")
                 else:
-                    st.warning("Please enter a base URL.")
+                    st.warning("⚠️ Please enter a base URL.")
         
         # Display discovered articles
         if st.session_state.articles_found:
-            st.subheader(f"Discovered Articles ({len(st.session_state.articles_found)})")
+            st.subheader(f"📋 Discovered Articles ({len(st.session_state.articles_found)})")
             
             # Show warning if many articles are found
             if len(st.session_state.articles_found) > 10:
@@ -665,9 +779,9 @@ def main():
             
             with col2:
                 if st.session_state.select_all:
-                    st.success(f"All {len(st.session_state.articles_found)} articles selected")
+                    st.success(f"✅ All {len(st.session_state.articles_found)} articles selected")
                 else:
-                    st.info("Select individual articles or use 'Select All'")
+                    st.info("ℹ️ Select individual articles or use 'Select All'")
             
             # Track selected articles
             selected_articles = []
@@ -704,7 +818,7 @@ def main():
                     minutes = estimated_time // 60
                     seconds = estimated_time % 60
                     time_msg = f"{minutes} minutes and {seconds} seconds" if minutes > 0 else f"{seconds} seconds"
-                    st.warning(f"⚠️ Generating {len(st.session_state.selected_articles)} PDFs may take approximately {time_msg}")
+                    st.warning(f"⏰ Generating {len(st.session_state.selected_articles)} PDFs may take approximately {time_msg}")
                 
                 # Generate PDFs button - ALWAYS show when there are selected articles
                 if st.button("🚀 Generate Selected PDFs", 
@@ -714,7 +828,7 @@ def main():
                     
                     # Double-check we have selected articles
                     if not st.session_state.selected_articles:
-                        st.error("No articles selected. Please select articles to generate PDFs.")
+                        st.error("❌ No articles selected. Please select articles to generate PDFs.")
                         return
                     
                     st.info(f"🚀 Generating PDFs for {len(st.session_state.selected_articles)} selected articles...")
@@ -794,7 +908,8 @@ def main():
                             data=zip_buffer.getvalue(),
                             file_name=f"medscape_articles_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
                             mime="application/zip",
-                            key="download_zip"
+                            key="download_zip",
+                            type="primary"
                         )
             
             with col2:
@@ -809,7 +924,8 @@ def main():
                             data=combined_pdf_buffer.getvalue(),
                             file_name=f"combined_articles_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                             mime="application/pdf",
-                            key="download_combined"
+                            key="download_combined",
+                            type="primary"
                         )
             
             st.info("💡 **Bulk Download Tips:**\n"
@@ -839,7 +955,8 @@ def main():
                         data=pdf_bytes,
                         file_name=os.path.basename(pdf['path']),
                         mime="application/pdf",
-                        key=f"download_{i}"
+                        key=f"download_{i}",
+                        type="primary"
                     )
     
     # Footer
@@ -847,7 +964,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center; color: gray;'>
-        <p>Medscape Article Scraper</p>
+        <p>Medscape Article Scraper | Enhanced User Agent Rotation | Use Responsibly</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -855,6 +972,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
