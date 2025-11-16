@@ -415,18 +415,35 @@ class ComprehensiveMedscapeScraper:
             complete_content = {}
             successful_sections = 0
             
-            for section_name, section_url in sections.items():
-                st.info(f"🔍 Scraping section: {section_name}")
+            # Create progress bar for single article mode
+            if st.session_state.get('single_article_mode', False):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                total_sections = len(sections)
+            
+            for i, (section_name, section_url) in enumerate(sections.items()):
+                if st.session_state.get('single_article_mode', False):
+                    status_text.text(f"🔍 Scraping section {i+1}/{total_sections}: {section_name}")
+                    progress_bar.progress((i + 1) / total_sections)
+                else:
+                    st.info(f"🔍 Scraping section: {section_name}")
+                
                 section_content = self.scrape_section_content(section_url, section_name)
                 
                 if section_content:
                     complete_content[section_name] = section_content
                     successful_sections += 1
-                    st.success(f"✅ {section_name}: {len(section_content)} content blocks")
+                    if st.session_state.get('single_article_mode', False):
+                        st.success(f"✅ {section_name}: {len(section_content)} content blocks")
                 else:
                     st.warning(f"⚠️ {section_name}: No content extracted")
                 
                 time.sleep(self.get_random_delay(1))
+            
+            # Clear progress indicators
+            if st.session_state.get('single_article_mode', False):
+                status_text.empty()
+                progress_bar.empty()
             
             # Get article info
             response = self.make_request(article_url)
@@ -638,12 +655,33 @@ def main():
         st.session_state.selected_articles = []
     if 'debug_mode' not in st.session_state:
         st.session_state.debug_mode = False
+    if 'single_article_mode' not in st.session_state:
+        st.session_state.single_article_mode = False
     
     # Settings sidebar
     with st.sidebar:
         st.header("⚙️ Settings")
         
         st.session_state.debug_mode = st.checkbox("Debug Mode", value=False)
+        
+        # Single Article Mode specific settings
+        st.markdown("---")
+        st.markdown("### 🔧 Single Article Settings")
+        single_article_delay = st.slider(
+            "Delay between section requests (seconds):",
+            min_value=1,
+            max_value=10,
+            value=3,
+            key="single_article_delay"
+        )
+        
+        st.session_state.scraper.user_agent_rotation_frequency = st.slider(
+            "User Agent Rotation Frequency:",
+            min_value=1,
+            max_value=10,
+            value=3,
+            help="Rotate user agent every N requests"
+        )
         
         st.markdown("---")
         st.markdown("### 📊 Statistics")
@@ -655,6 +693,7 @@ def main():
         st.markdown("### ℹ️ About")
         st.info(
             "This tool helps scrape medical articles from Medscape. "
+            "Please use responsibly and respect rate limits."
         )
     
     # Mode selection
@@ -665,54 +704,131 @@ def main():
     )
     
     if mode == "Single Article":
+        st.session_state.single_article_mode = True
         st.header("Single Article Mode")
         
-        article_url = st.text_input(
-            "Enter Article URL:",
-            placeholder="https://emedicine.medscape.com/article/..."
-        )
+        col1, col2 = st.columns([3, 1])
         
-        if st.button("Generate PDF", key="single_article", type="primary"):
+        with col1:
+            article_url = st.text_input(
+                "Enter Article URL:",
+                placeholder="https://emedicine.medscape.com/article/..."
+            )
+        
+        with col2:
+            st.markdown("###")
+            generate_btn = st.button("🚀 Generate PDF", key="single_article", type="primary", use_container_width=True)
+        
+        if generate_btn:
             if article_url:
-                with st.spinner("Scraping article content..."):
-                    article_data = st.session_state.scraper.scrape_complete_article(article_url)
-                    
-                    if article_data and article_data['sections']:
-                        st.success(f"✅ Successfully scraped article: {article_data['title']}")
+                # Validate URL format
+                if not re.match(r'https?://emedicine\.medscape\.com/article/\d+', article_url):
+                    st.warning("⚠️ Please enter a valid Medscape article URL")
+                    st.info("💡 Example: https://emedicine.medscape.com/article/1234567-overview")
+                else:
+                    with st.spinner("🔄 Initializing scraper with enhanced user agent rotation..."):
+                        # Reset request count for new session
+                        st.session_state.scraper.request_count = 0
                         
-                        # Display article info
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Sections", f"{article_data['successful_sections']}/{article_data['total_sections']}")
-                        with col2:
-                            st.metric("Content Blocks", article_data['total_content_blocks'])
-                        with col3:
-                            st.metric("Authors", len(article_data['authors']))
+                        # Create progress container
+                        progress_container = st.container()
                         
-                        # Generate PDF
-                        with st.spinner("Generating PDF..."):
-                            pdf_path = st.session_state.scraper.create_comprehensive_pdf(article_data)
+                        with progress_container:
+                            st.info("🔍 Starting article scraping with enhanced user agent rotation...")
                             
-                            if pdf_path:
-                                st.success("✅ PDF generated successfully!")
+                            # Show user agent info
+                            if st.session_state.debug_mode:
+                                current_agent = st.session_state.scraper.session.headers['User-Agent']
+                                st.write(f"🎭 Initial User Agent: {current_agent[:60]}...")
+                            
+                            article_data = st.session_state.scraper.scrape_complete_article(article_url)
+                        
+                        if article_data and article_data['sections']:
+                            st.success(f"✅ Successfully scraped article: {article_data['title']}")
+                            
+                            # Display comprehensive article info
+                            st.markdown("### 📊 Article Statistics")
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("Sections Scraped", f"{article_data['successful_sections']}/{article_data['total_sections']}")
+                            with col2:
+                                st.metric("Content Blocks", article_data['total_content_blocks'])
+                            with col3:
+                                st.metric("Authors", len(article_data['authors']))
+                            with col4:
+                                st.metric("Requests Made", st.session_state.scraper.request_count)
+                            
+                            # Show sections overview
+                            with st.expander("📋 Sections Overview", expanded=True):
+                                for section_name, section_content in article_data['sections'].items():
+                                    blocks_count = len(section_content)
+                                    st.write(f"• **{section_name}**: {blocks_count} content blocks")
+                            
+                            # Generate PDF
+                            with st.spinner("📄 Generating PDF document..."):
+                                pdf_path = st.session_state.scraper.create_comprehensive_pdf(article_data)
                                 
-                                # Download button
-                                with open(pdf_path, "rb") as pdf_file:
-                                    pdf_bytes = pdf_file.read()
-                                
-                                st.download_button(
-                                    label="📥 Download PDF",
-                                    data=pdf_bytes,
-                                    file_name=os.path.basename(pdf_path),
-                                    mime="application/pdf",
-                                    type="primary"
-                                )
-                    else:
-                        st.error("❌ Failed to scrape article content. Please check the URL and try again.")
+                                if pdf_path:
+                                    st.success("✅ PDF generated successfully!")
+                                    
+                                    # File info
+                                    file_size = os.path.getsize(pdf_path) / 1024  # KB
+                                    st.info(f"📁 File: `{os.path.basename(pdf_path)}` ({file_size:.1f} KB)")
+                                    
+                                    # Download button
+                                    with open(pdf_path, "rb") as pdf_file:
+                                        pdf_bytes = pdf_file.read()
+                                    
+                                    col1, col2, col3 = st.columns([2, 1, 1])
+                                    with col1:
+                                        st.download_button(
+                                            label="📥 Download PDF",
+                                            data=pdf_bytes,
+                                            file_name=os.path.basename(pdf_path),
+                                            mime="application/pdf",
+                                            type="primary",
+                                            use_container_width=True
+                                        )
+                                    
+                                    with col2:
+                                        # Add to batch option
+                                        if st.button("➕ Add to Batch", use_container_width=True):
+                                            if pdf_path not in [pdf['path'] for pdf in st.session_state.generated_pdfs]:
+                                                st.session_state.generated_pdfs.append({
+                                                    'title': article_data['title'],
+                                                    'path': pdf_path,
+                                                    'size': os.path.getsize(pdf_path),
+                                                    'sections': len(article_data['sections']),
+                                                    'content_blocks': article_data['total_content_blocks']
+                                                })
+                                                st.success("✅ Added to batch download list!")
+                                            else:
+                                                st.info("ℹ️ Article already in batch list")
+                                    
+                                    with col3:
+                                        if st.button("🔄 Scrape Another", use_container_width=True):
+                                            st.rerun()
+                                    
+                                    # Debug info
+                                    if st.session_state.debug_mode:
+                                        with st.expander("🔍 Debug Information"):
+                                            st.write(f"Total requests made: {st.session_state.scraper.request_count}")
+                                            st.write(f"User agents used: {st.session_state.scraper.request_count // st.session_state.scraper.user_agent_rotation_frequency}")
+                                            st.write(f"Current user agent: {st.session_state.scraper.session.headers['User-Agent']}")
+                        else:
+                            st.error("❌ Failed to scrape article content. Please check the URL and try again.")
+                            st.info("💡 Tips:")
+                            st.write("- Ensure the URL is correct and accessible")
+                            st.write("- Try again later if the server is busy")
+                            st.write("- Check if the article requires login")
+                            
+                            if st.session_state.debug_mode:
+                                st.write(f"Debug: Request count: {st.session_state.scraper.request_count}")
             else:
                 st.warning("⚠️ Please enter an article URL.")
     
     else:  # Multiple Articles mode
+        st.session_state.single_article_mode = False
         st.header("Multiple Articles Mode")
         
         col1, col2 = st.columns(2)
@@ -728,16 +844,8 @@ def main():
                 "Delay between requests (seconds):",
                 min_value=1,
                 max_value=10,
-                value=3
-            )
-            
-            # Update scraper delay setting
-            st.session_state.scraper.user_agent_rotation_frequency = st.slider(
-                "User Agent Rotation Frequency:",
-                min_value=1,
-                max_value=10,
                 value=3,
-                help="Rotate user agent every N requests"
+                key="multi_article_delay"
             )
         
         with col2:
@@ -963,7 +1071,7 @@ def main():
     st.markdown(
         """
         <div style='text-align: center; color: gray;'>
-        <p>Medscape Article Scraper </p>
+        <p>Medscape Article Scraper | Enhanced User Agent Rotation | Use Responsibly</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -971,4 +1079,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
