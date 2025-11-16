@@ -1447,7 +1447,7 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    st.title("🏥 Advanced Medscape Scraper Pro")
+    st.title("🏥 Medscape Scraper")
     st.markdown("---")
     
     # Initialize session state with enhanced features
@@ -1550,4 +1550,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
